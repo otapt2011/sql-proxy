@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Northwind Explorer (Proxy API)</title>
+  <style>
+    body { font-family: system-ui; max-width: 800px; margin: 2rem auto; padding: 1rem; background: #f5f5f5; }
+    .card { background: white; border-radius: 16px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    label { font-weight: bold; display: block; margin-top: 1rem; }
+    input, select, button { width: 100%; padding: 0.75rem; margin: 0.5rem 0; border-radius: 12px; border: 1px solid #ccc; font-size: 1rem; }
+    button { background: #2563eb; color: white; font-weight: bold; cursor: pointer; border: none; }
+    button:active { transform: scale(0.98); }
+    pre { background: #1e1e2e; color: #f0f0f0; padding: 1rem; overflow-x: auto; border-radius: 12px; font-size: 0.8rem; white-space: pre-wrap; word-wrap: break-word; }
+    .log { background: #f0f0f0; padding: 0.75rem; font-size: 0.7rem; margin-top: 1rem; max-height: 200px; overflow-y: auto; border-radius: 12px; }
+    .error { color: #ef4444; }
+    .success { color: #10b981; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>🗄️ Northwind Database Explorer</h2>
+  <p>Using proxy API (northwind.vercel.app)</p>
+
+  <label>🔐 API Key</label>
+  <input type="password" id="apiKey" placeholder="Your API_SECRET_KEY">
+  <button id="saveKeyBtn">💾 Save Key</button>
+  <span id="keyStatus"></span>
+
+  <label>📋 Select Table</label>
+  <select id="tableSelect">
+    <option value="">-- Loading tables --</option>
+  </select>
+  <button id="loadTableBtn">▶ Load Table Data</button>
+
+  <div id="result"></div>
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+  function log(msg, type = 'info') {
+    const logDiv = document.getElementById('log');
+    const line = document.createElement('div');
+    line.style.color = type === 'error' ? '#ef4444' : (type === 'success' ? '#10b981' : '#333');
+    line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logDiv.appendChild(line);
+    line.scrollIntoView();
+  }
+
+  let apiKey = localStorage.getItem('myKey') || '';
+  const keyInput = document.getElementById('apiKey');
+  keyInput.value = apiKey;
+  const keyStatus = document.getElementById('keyStatus');
+  keyStatus.innerText = apiKey ? '✅ Key loaded' : '❌ No key';
+  if (apiKey) log('API key loaded', 'success');
+  else log('Enter and save your API key', 'error');
+
+  document.getElementById('saveKeyBtn').onclick = () => {
+    apiKey = keyInput.value.trim();
+    if (apiKey) {
+      localStorage.setItem('myKey', apiKey);
+      keyStatus.innerText = '✅ Saved';
+      log('API key saved', 'success');
+      loadTables(); // reload tables
+    } else {
+      localStorage.removeItem('myKey');
+      keyStatus.innerText = '❌ Removed';
+      log('API key removed', 'error');
+    }
+  };
+
+  async function loadTables() {
+    if (!apiKey) {
+      log('No API key, cannot load tables', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/db', {
+        headers: { 'X-API-Key': apiKey }
+      });
+      const data = await res.json();
+      if (data.tables) {
+        const select = document.getElementById('tableSelect');
+        select.innerHTML = '<option value="">-- Select a table --</option>' +
+          data.tables.map(t => `<option value="${t}">${t}</option>`).join('');
+        log(`Loaded ${data.tables.length} tables`, 'success');
+      } else {
+        log('No tables returned', 'error');
+      }
+    } catch (err) {
+      log(`Failed to load tables: ${err.message}`, 'error');
+    }
+  }
+
+  async function loadTableData(table) {
+    if (!apiKey) {
+      log('No API key', 'error');
+      return;
+    }
+    if (!table) {
+      log('No table selected', 'error');
+      return;
+    }
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<div style="color:#2563eb">⏳ Loading...</div>';
+    log(`Fetching table: ${table}`);
+    try {
+      const res = await fetch(`/api/db?table=${table}`, {
+        headers: { 'X-API-Key': apiKey }
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.data) {
+        resultDiv.innerHTML = `<pre>${JSON.stringify(data.data, null, 2)}</pre>`;
+        log(`Loaded ${data.data.length} rows from ${table}`, 'success');
+      } else {
+        resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        log('Data received', 'success');
+      }
+    } catch (err) {
+      resultDiv.innerHTML = `<div style="color:#ef4444">❌ ${err.message}</div>`;
+      log(`Error: ${err.message}`, 'error');
+    }
+  }
+
+  document.getElementById('loadTableBtn').onclick = () => {
+    const select = document.getElementById('tableSelect');
+    const table = select.value;
+    if (table) loadTableData(table);
+    else log('Please select a table', 'error');
+  };
+
+  // Auto-load tables if key is present
+  if (apiKey) loadTables();
+</script>
+</body>
+</html>
