@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Northwind Explorer</title>
+  <style>
+    body { font-family: system-ui; max-width: 800px; margin: 2rem auto; padding: 1rem; background: #f5f5f5; }
+    .card { background: white; border-radius: 16px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    input, button, textarea { width: 100%; padding: 0.75rem; margin: 0.5rem 0; border-radius: 12px; border: 1px solid #ccc; font-family: monospace; }
+    button { background: #2563eb; color: white; font-weight: bold; cursor: pointer; }
+    button:active { transform: scale(0.98); }
+    pre { background: #1e1e2e; color: #f0f0f0; padding: 1rem; overflow-x: auto; border-radius: 12px; font-size: 0.8rem; }
+    .log { background: #f0f0f0; padding: 0.75rem; font-size: 0.7rem; margin-top: 1rem; max-height: 200px; overflow-y: auto; border-radius: 12px; }
+    .error { color: #ef4444; }
+    .success { color: #10b981; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>🗄️ Northwind SQLite Explorer</h2>
+  <label>🔐 API Key</label>
+  <input type="password" id="apiKey" placeholder="Your API_SECRET_KEY">
+  <button id="saveKeyBtn">💾 Save Key</button>
+  <span id="keyStatus"></span>
+
+  <label>📝 SQL Query</label>
+  <textarea id="sqlQuery" rows="3">SELECT name FROM sqlite_master WHERE type='table'</textarea>
+  <button id="executeBtn">▶ Execute</button>
+
+  <div id="result"></div>
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+  function log(msg, type = 'info') {
+    const logDiv = document.getElementById('log');
+    const line = document.createElement('div');
+    line.style.color = type === 'error' ? '#ef4444' : (type === 'success' ? '#10b981' : '#333');
+    line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logDiv.appendChild(line);
+    line.scrollIntoView();
+  }
+
+  let apiKey = localStorage.getItem('myKey') || '';
+  const keyInput = document.getElementById('apiKey');
+  keyInput.value = apiKey;
+  document.getElementById('keyStatus').innerHTML = apiKey ? '✅ Key loaded' : '❌ No key';
+  if (apiKey) log('API key loaded', 'success');
+  else log('Enter and save your API key', 'error');
+
+  document.getElementById('saveKeyBtn').onclick = () => {
+    apiKey = keyInput.value.trim();
+    if (apiKey) {
+      localStorage.setItem('myKey', apiKey);
+      document.getElementById('keyStatus').innerHTML = '✅ Saved';
+      log('API key saved', 'success');
+    } else {
+      localStorage.removeItem('myKey');
+      document.getElementById('keyStatus').innerHTML = '❌ Removed';
+      log('API key removed', 'error');
+    }
+  };
+
+  document.getElementById('executeBtn').onclick = async () => {
+    const sql = document.getElementById('sqlQuery').value.trim();
+    if (!sql) { log('Query empty', 'error'); return; }
+    if (!apiKey) { log('No API key', 'error'); return; }
+
+    const url = `/api/db?sql=${encodeURIComponent(sql)}`;
+    log(`➡️ ${url}`);
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<div style="color:#2563eb">⏳ Executing...</div>';
+
+    try {
+      const res = await fetch(url, { headers: { 'X-API-Key': apiKey } });
+      log(`⬅️ Status: ${res.status}`);
+      const raw = await res.text();
+      log(`📄 Raw: ${raw.substring(0, 200)}`);
+      let json;
+      try { json = JSON.parse(raw); } catch(e) { throw new Error(`Invalid JSON: ${raw.substring(0, 100)}`); }
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      resultDiv.innerHTML = `<pre>${JSON.stringify(json, null, 2)}</pre>`;
+      log('✅ Success', 'success');
+    } catch (err) {
+      resultDiv.innerHTML = `<div style="color:#ef4444">❌ ${err.message}</div>`;
+      log(`❌ ${err.message}`, 'error');
+    }
+  };
+</script>
+</body>
+</html>
