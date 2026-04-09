@@ -1,5 +1,5 @@
 // This endpoint serves data from a public Northwind JSON dataset
-const NORTHWIND_JSON_URL = 'https://raw.githubusercontent.com/agershun/agensgraph-jupyter/master/datasets/northwind/northwind.json';
+const NORTHWIND_JSON_URL = 'https://raw.githubusercontent.com/haqueabida/northwind/refs/heads/master/northwind.json';
 
 let cachedData = null;
 
