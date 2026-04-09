@@ -1,7 +1,5 @@
 {
-  "name": "sqlite-proxy",
+  "name": "sql-proxy",
   "version": "1.0.0",
-  "dependencies": {
-    "sql.js": "^1.10.3"
-  }
+  "dependencies": {}
 }
